@@ -1,0 +1,137 @@
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local followingPlayer = nil
+local isFollowing = false
+local billboard = nil
+local line = nil
+
+-- Function to create a BillboardGui above the targeted player's head
+local function createBillboard(targetPlayer)
+    if billboard then
+        billboard:Destroy() -- Remove existing billboard if it exists
+    end
+
+    billboard = Instance.new("BillboardGui")
+    billboard.Adornee = targetPlayer.Character.Head -- Attach to the player's head
+    billboard.Size = UDim2.new(2.5, 0, 2.5, 0) -- Increase size of the billboard for better visibility
+    billboard.StudsOffset = Vector3.new(0, 3, 0) -- Offset above the head
+    billboard.AlwaysOnTop = true -- Always visible
+
+    local label = Instance.new("TextLabel")
+    label.Text = "Following"
+    label.Font = Enum.Font.FredokaOne -- Use FredokaOne font
+    label.TextColor3 = Color3.fromRGB(255, 0, 0) -- Red color
+    label.BackgroundTransparency = 1 -- Make background transparent
+    label.Size = UDim2.new(1, 0, 3, 0) -- Increase size of the label (taller for better visibility)
+    label.TextScaled = true -- Scale the text to fit the label
+
+    label.Parent = billboard -- Parent the label to the billboard
+    billboard.Parent = targetPlayer.Character.Head -- Parent the billboard to the player's head
+end
+
+-- Function to create a guiding line
+local function createGuidingLine(targetPosition)
+    if line then
+        line:Destroy() -- Remove existing line if it exists
+    end
+
+    line = Instance.new("LineHandleAdornment")
+    line.Color3 = Color3.fromRGB(255, 0, 0) -- Red color for the line
+    line.Transparency = 0.5 -- Semi-transparent
+    line.Length = (LocalPlayer.Character.HumanoidRootPart.Position - targetPosition).Magnitude -- Length of the line
+    line.Adornee = LocalPlayer.Character.HumanoidRootPart -- Attach to the player's humanoid root part
+    line.Parent = LocalPlayer.Character.HumanoidRootPart -- Parent to the local player's humanoid root part
+    line.Thickness = 0.5 -- Increase thickness of the line (adjust as needed)
+end
+
+-- Function to follow the clicked player
+local function followPlayer(targetPlayer)
+    isFollowing = true
+    followingPlayer = targetPlayer
+    createBillboard(targetPlayer) -- Create billboard when following starts
+
+    -- Move towards the target player
+    while isFollowing and followingPlayer and followingPlayer.Character and followingPlayer.Character:FindFirstChild("HumanoidRootPart") do
+        local targetPosition = followingPlayer.Character.HumanoidRootPart.Position
+        local myHumanoidRootPart = LocalPlayer.Character.HumanoidRootPart
+
+        -- Create or update the guiding line
+        createGuidingLine(targetPosition)
+
+        -- Move towards the target position using Humanoid:MoveTo()
+        LocalPlayer.Character.Humanoid:MoveTo(targetPosition)
+
+        -- Check for obstacles in the way
+        local direction = (targetPosition - myHumanoidRootPart.Position).unit
+        local ray = Ray.new(myHumanoidRootPart.Position, direction * 5) -- Create a ray to check for obstacles
+        local hitPart, hitPosition = game.Workspace:FindPartOnRay(ray, LocalPlayer.Character)
+
+        if hitPart then
+            -- If there is an obstacle, jump
+            LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+
+        -- Check if close enough to stop following
+        if (myHumanoidRootPart.Position - targetPosition).magnitude < 3 then
+            break -- Stop following if close enough
+        end
+
+        wait(0.1) -- Adjust following speed if necessary
+    end
+
+    -- Stop following, destroy the billboard and line
+    if billboard then
+        billboard:Destroy()
+        billboard = nil
+    end
+    if line then
+        line:Destroy()
+        line = nil
+    end
+end
+
+-- Function to stop following
+local function stopFollowing()
+    isFollowing = false
+    followingPlayer = nil
+    if line then
+        line:Destroy()
+        line = nil
+    end
+end
+
+-- Listen for clicks on players
+Mouse.Button1Down:Connect(function()
+    local target = Mouse.Target
+
+    if target and target.Parent then
+        local targetPlayer = Players:GetPlayerFromCharacter(target.Parent)
+
+        if targetPlayer then
+            if isFollowing and followingPlayer == targetPlayer then
+                stopFollowing() -- Stop following if already following this player
+            else
+                stopFollowing() -- Stop following any player first
+                followPlayer(targetPlayer) -- Start following the new target player
+            end
+        end
+    end
+end)
+
+-- Debug: Check if FredokaOne is available
+local function checkFontAvailability()
+    local fontAvailable = false
+    for _, font in pairs(Enum.Font:GetEnumItems()) do
+        if font == Enum.Font.FredokaOne then
+            fontAvailable = true
+            break
+        end
+    end
+    if not fontAvailable then
+        warn("FredokaOne font is not available.")
+    end
+end
+
+checkFontAvailability()
